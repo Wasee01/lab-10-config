@@ -61,7 +61,8 @@ def run(name, profile, expected, external=None, env_value=None, system=None, cli
             if name.startswith('profile'):
                 for path in ('env', 'beans', 'configprops', 'loggers', 'shutdown'):
                     assert request(port, '/actuator/' + path)[0] == 404, path
-                assert request(port, '/actuator/info')[0] == 200
+                info_status, info = request(port, '/actuator/info')
+                assert info_status == 200 and info['app']['environment'] == profile, info
                 assert request(port, '/actuator/metrics')[0] == 200
                 health_status, health = request(port, '/actuator/health')
                 assert health_status in (200, 503)
@@ -81,6 +82,13 @@ def run(name, profile, expected, external=None, env_value=None, system=None, cli
                 process.wait()
 
 
+prediction_commit = subprocess.check_output(
+    ['git', 'log', '--reverse', '--format=%H', '--', 'docs/precedence-predictions.md'],
+    cwd=ROOT, text=True).splitlines()[0]
+original_tree = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', prediction_commit],
+                                        cwd=ROOT, text=True)
+assert 'src/test/' not in original_tree and 'scripts/verify.py' not in original_tree
+subprocess.run(['git', 'merge-base', '--is-ancestor', prediction_commit, 'HEAD'], cwd=ROOT, check=True)
 before = digest()
 results = []
 with tempfile.TemporaryDirectory() as folder:
